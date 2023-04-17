@@ -1,0 +1,75 @@
+ARG REPO_LOCATION
+ARG DEBIAN_FRONTEND=noninteractive
+
+#=========================================================================
+FROM ${REPO_LOCATION}/ubuntu:20.04 AS base-0
+
+#=========================================================================
+FROM base-0 AS ubuntu-stage1
+ARG DEBIAN_FRONTEND
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+
+RUN echo . \
+    && dpkg --add-architecture i386 \
+    && apt update && apt upgrade -y \
+    && apt install -y --no-install-recommends \
+    wget \
+    ca-certificates \
+    xz-utils \
+    libpng-dev \
+    zlib1g-dev \
+    libtiff-dev \
+    libsdl2-dev \
+    libsdl2-image-dev \
+    graphviz \
+    graphviz-dev \
+    build-essential \
+    libxmu-dev \
+    libxi-dev \
+    libgl-dev \
+    libosmesa-dev \
+    python3 \
+    python3-pip \
+    curl \
+    libz1:i386 \
+    libc6-dev-i386 \
+    libc6:i386 \
+    libstdc++6:i386 \
+    g++-multilib \
+    git \
+    diffstat \
+    texinfo \
+    gawk \
+    chrpath \
+    libfreetype6-dev \
+    mono-runtime \
+    flex \
+    libssl-dev \
+    u-boot-tools \
+    libdevil-dev \
+    bison \
+    python3-pyelftools \
+    python3-dev \
+    libx11-dev \
+    unzip \
+    libncurses5 \
+    tree \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /root
+RUN echo "if [ -n \"$BASH_VERSION\" ]; then"     >  .profile && \
+    echo "    # include .bashrc if it exists"    >> .profile && \
+    echo "    if [ -f \"$HOME/.bashrc\" ]; then" >> .profile && \
+    echo "        . \"$HOME/.bashrc\""           >> .profile && \
+    echo "    fi"                                >> .profile && \
+    echo "fi"                                    >> .profile && \
+    echo "#!/bin/bash"                           >  .bashrc  && \
+    echo "export PS1=\"${debian_chroot:+($debian_chroot)}\u@pc-docker:\w\$ \"" >> .bashrc
+
+ENV WORK_DIR=/root/${HOME}
+

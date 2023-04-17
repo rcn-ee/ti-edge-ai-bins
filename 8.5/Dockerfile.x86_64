@@ -1,0 +1,68 @@
+ARG REPO_LOCATION=
+ARG DEBIAN_FRONTEND=noninteractive
+
+#=========================================================================
+FROM --platform=${REPO_LOCATION} tisdk_base_x86_64 AS base-0
+
+#=========================================================================
+FROM base-0 AS ubuntu-stage1
+ARG DEBIAN_FRONTEND
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+
+#=========================================================================
+#https://software-dl.ti.com/jacinto7/esd/processor-sdk-linux-sk-tda4vm/08_05_00/exports/docs/development_flow.html
+ENV PSDK_RTOS_VER=08_05_00_11
+
+WORKDIR /opt
+RUN echo . \
+    && wget https://dr-download.ti.com/software-development/software-development-kit-sdk/MD-bA0wfI4X2g/08.05.00.11/ti-processor-sdk-rtos-j721e-evm-${PSDK_RTOS_VER}.tar.gz \
+    && tar xf ti-processor-sdk-rtos-j721e-evm-${PSDK_RTOS_VER}.tar.gz \
+    && rm ti-processor-sdk-rtos-j721e-evm-${PSDK_RTOS_VER}.tar.gz \
+    && cd ti-processor-sdk-rtos-j721e-evm-${PSDK_RTOS_VER} \
+    && wget https://dr-download.ti.com/software-development/software-development-kit-sdk/MD-U6uMjOroyO/08.05.00.08/tisdk-default-image-j7-evm.tar.xz \
+    && wget https://dr-download.ti.com/software-development/software-development-kit-sdk/MD-U6uMjOroyO/08.05.00.08/boot-j7-evm.tar.gz \
+    && echo .
+
+WORKDIR /opt
+RUN echo . \
+    && cd /opt/ti-processor-sdk-rtos-j721e-evm-${PSDK_RTOS_VER}/psdk_rtos \
+    && cd /opt/ti-processor-sdk-rtos-j721e-evm-${PSDK_RTOS_VER} \
+    && /bin/bash ./psdk_rtos/scripts/setup_psdk_rtos.sh --skip_sudo \
+    && echo .
+
+ARG MAX_PARALLEL_BUILDS
+WORKDIR /opt
+RUN echo . \
+    && cd /opt/ti-processor-sdk-rtos-j721e-evm-${PSDK_RTOS_VER}/vision_apps \
+    && BUILD_EMULATION=no BUILD_TARGET_MODE=yes BUILD_LINUX_A72=yes BUILD_EDGEAI=yes PROFILE=release make linux_host_libs_includes -j ${MAX_PARALLEL_BUILDS} \
+    && BUILD_EMULATION=no BUILD_TARGET_MODE=yes BUILD_LINUX_A72=yes BUILD_EDGEAI=yes PROFILE=release make -j ${MAX_PARALLEL_BUILDS} \
+    && mkdir /tmp/vx_app/ \
+    && cp -v /opt/ti-processor-sdk-rtos-j721e-evm-${PSDK_RTOS_VER}/vision_apps/out/J7/A72/LINUX/release/vx_app*.out /tmp/vx_app/ \
+    && cd /tmp/vx_app \
+    && tar cJf /opt/vx_app_${PSDK_RTOS_VER}.tar.xz . \
+    && cd /tmp/tivision_apps_targetfs_stage \
+    && tar cJf /opt/tivision_apps_${PSDK_RTOS_VER}.tar.xz . \
+    && cd /opt/ti-processor-sdk-rtos-j721e-evm-${PSDK_RTOS_VER}/vision_apps \
+    && BUILD_EMULATION=no BUILD_TARGET_MODE=yes BUILD_LINUX_A72=yes BUILD_EDGEAI=yes PROFILE=release make linux_fs_stage -j ${MAX_PARALLEL_BUILDS} \
+    && cd /tmp/tivision_apps_targetfs_stage/lib/firmware/ \
+    && tar cJf /opt/firmware_${PSDK_RTOS_VER}.tar.xz . \
+    && cd \
+    && rm -rf /tmp/tivision_apps_targetfs_stage \
+    && cd /opt/ti-processor-sdk-rtos-j721e-evm-${PSDK_RTOS_VER}/targetfs \
+    && tar cJf /opt/rtos_dlr_${PSDK_RTOS_VER}.tar.xz `find . | grep dlr` \
+    && echo .
+
+
+WORKDIR /root
+RUN echo "if [ -n \"$BASH_VERSION\" ]; then"     >  .profile && \
+    echo "    # include .bashrc if it exists"    >> .profile && \
+    echo "    if [ -f \"$HOME/.bashrc\" ]; then" >> .profile && \
+    echo "        . \"$HOME/.bashrc\""           >> .profile && \
+    echo "    fi"                                >> .profile && \
+    echo "fi"                                    >> .profile && \
+    echo "#!/bin/bash"                           >  .bashrc  && \
+    echo "export PS1=\"${debian_chroot:+($debian_chroot)}\u@pc-docker:\w\$ \"" >> .bashrc
+
+ENV WORK_DIR=/root/${HOME}
+
